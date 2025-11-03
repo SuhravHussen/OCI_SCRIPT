@@ -86,7 +86,10 @@ def try_create_instance():
             try:
                 list_volumes = volume_client.list_volumes(compartment_id=compartmentId).data
             except Exception as e:
-                error_msg = f"{e.status} - {e.code} - {e.message}"
+                if isinstance(e, oci.exceptions.ServiceError):
+                    error_msg = f"{e.status} - {e.code} - {e.message}"
+                else:
+                    error_msg = f"{type(e).__name__}: {str(e)}"
                 logging.error(error_msg)
                 return {
                     "status": "error",
@@ -300,6 +303,19 @@ def trigger_instance_creation():
     logging.info("=" * 60)
     logging.info("Instance creation triggered via HTTP request")
     logging.info("=" * 60)
+
+    # Ensure OCI clients are initialized when running under gunicorn
+    try:
+        if any(client is None for client in (to_launch_instance, identity_client, vnc_client, volume_client)):
+            initialize_oci_clients()
+    except Exception as e:
+        err = f"{type(e).__name__}: {e}"
+        logging.error(f"Failed to initialize OCI clients: {err}")
+        return jsonify({
+            "status": "error",
+            "message": "OCI clients not initialized. Check config and private_key.pem files.",
+            "error": err
+        }), 200
 
     result = try_create_instance()
 
