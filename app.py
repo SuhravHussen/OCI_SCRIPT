@@ -24,6 +24,7 @@ import sys
 import telebot
 import datetime
 import os
+import threading
 from flask import Flask, jsonify, request
 
 # Initialize Flask app
@@ -71,6 +72,37 @@ def initialize_oci_clients():
     email = identity_client.list_users(compartment_id=compartmentId).data[0].email
 
     logging.info(f"OCI clients initialized for account: {cloud_name} ({email})")
+
+def run_multiple_attempts():
+    """
+    Background worker that runs try_create_instance() 4 times with 10-second intervals.
+    Stops early if instance creation succeeds.
+    """
+    logging.info("=" * 60)
+    logging.info("Starting 4 instance creation attempts with 10-second intervals")
+    logging.info("=" * 60)
+
+    for attempt_num in range(1, 5):
+        logging.info(f">>> Attempt {attempt_num}/4 starting...")
+
+        result = try_create_instance()
+
+        logging.info(f">>> Attempt {attempt_num}/4 result: {result.get('status', 'unknown')}")
+
+        # If instance creation succeeded, stop further attempts
+        if result.get('status') == 'success':
+            logging.info(f">>> Instance created successfully on attempt {attempt_num}/4. Stopping further attempts.")
+            break
+
+        # If not the last attempt, wait 10 seconds before next attempt
+        if attempt_num < 4:
+            logging.info(f">>> Waiting 10 seconds before attempt {attempt_num + 1}/4...")
+            time.sleep(10)
+
+    logging.info("=" * 60)
+    logging.info("Completed all scheduled instance creation attempts")
+    logging.info("=" * 60)
+
 
 def try_create_instance():
     """
@@ -299,7 +331,7 @@ def health_check():
 
 @app.route('/trigger', methods=['GET'])
 def trigger_instance_creation():
-    """Trigger endpoint to attempt instance creation. Always returns HTTP 200."""
+    """Trigger endpoint to attempt instance creation 4 times with 10-second intervals. Always returns HTTP 200."""
     logging.info("=" * 60)
     logging.info("Instance creation triggered via HTTP request")
     logging.info("=" * 60)
@@ -317,10 +349,17 @@ def trigger_instance_creation():
             "error": err
         }), 200
 
-    result = try_create_instance()
+    # Start background thread to run 4 attempts with 10-second intervals
+    background_thread = threading.Thread(target=run_multiple_attempts, daemon=True)
+    background_thread.start()
 
-    # Always return HTTP 200; the actual status is conveyed in the JSON body
-    return jsonify(result), 200
+    # Return immediately with HTTP 200
+    return jsonify({
+        "status": "scheduled",
+        "message": "4 instance creation attempts scheduled with 10-second intervals",
+        "attempts": 4,
+        "interval_seconds": 10
+    }), 200
 
 
 if __name__ == '__main__':

@@ -34,7 +34,7 @@ def test_trigger_endpoint(base_url):
     print("\n" + "=" * 60)
     print("Testing Trigger Endpoint (GET /trigger)")
     print("=" * 60)
-    print("⚠️  This will attempt to create an Oracle Cloud instance!")
+    print("⚠️  This will schedule 4 instance creation attempts!")
     print("⚠️  Make sure your OCI credentials are configured correctly.")
 
     confirm = input("\nProceed with trigger test? (y/n): ")
@@ -44,18 +44,17 @@ def test_trigger_endpoint(base_url):
 
     try:
         print("\nSending GET request to /trigger...")
-        response = requests.get(f"{base_url}/trigger", timeout=180)
+        response = requests.get(f"{base_url}/trigger", timeout=10)
         print(f"Status Code: {response.status_code}")
         print(f"Response: {json.dumps(response.json(), indent=2)}")
-        
+
         result = response.json()
         status = result.get("status")
-        
-        if status == "success":
-            print("✅ Instance created successfully!")
-            return True
-        elif status == "out_of_capacity":
-            print("⚠️  Out of capacity (expected - will retry on next trigger)")
+
+        if status == "scheduled":
+            print("✅ 4 instance creation attempts scheduled successfully!")
+            print("⚠️  Check server logs to see the actual results of each attempt")
+            print("⚠️  Attempts run in background with 10-second intervals (~30 seconds total)")
             return True
         elif status == "error":
             print("❌ Configuration error - check your OCI credentials")
@@ -64,7 +63,7 @@ def test_trigger_endpoint(base_url):
             print("❌ Unexpected response")
             return False
     except requests.exceptions.Timeout:
-        print("⚠️  Request timed out (instance creation can take 60+ seconds)")
+        print("⚠️  Request timed out")
         print("Check server logs for actual result")
         return None
     except Exception as e:
