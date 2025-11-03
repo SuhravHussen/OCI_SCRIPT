@@ -296,24 +296,15 @@ def health_check():
 
 @app.route('/trigger', methods=['GET'])
 def trigger_instance_creation():
-    """Trigger endpoint to attempt instance creation"""
+    """Trigger endpoint to attempt instance creation. Always returns HTTP 200."""
     logging.info("=" * 60)
     logging.info("Instance creation triggered via HTTP request")
     logging.info("=" * 60)
 
     result = try_create_instance()
 
-    # Map status to HTTP status codes
-    status_code_map = {
-        "success": 200,
-        "out_of_capacity": 503,
-        "failed": 500,
-        "error": 500
-    }
-
-    status_code = status_code_map.get(result.get("status"), 500)
-
-    return jsonify(result), status_code
+    # Always return HTTP 200; the actual status is conveyed in the JSON body
+    return jsonify(result), 200
 
 
 if __name__ == '__main__':
